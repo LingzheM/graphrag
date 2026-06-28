@@ -1,0 +1,12 @@
+[project]
+name = "graphrag"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["graphrag-common==0.1.0", "typer>=0.12"]
+
+[project.scripts]
+graphrag = "graphrag.cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
