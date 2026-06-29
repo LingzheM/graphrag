@@ -39,7 +39,7 @@ def cached_chat(prompt: str) -> str:
   path = os.path.join(CACHE_DIR, key + ".json")
   #  实现缓存逻辑
   if os.path.exists(path):
-    with open(paht, encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
       return json.load(f)
     
   resp = ollama.chat(
