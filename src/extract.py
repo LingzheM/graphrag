@@ -1,7 +1,10 @@
 
 import os
+import json
 import hashlib
 import pandas as pd
+import ollama
+from model import Entity, Relationship
 
 CHAT_MODEL = "qwen2.5:7b"
 OUTPUT_DIR = "output"
@@ -34,16 +37,43 @@ def cached_chat(prompt: str) -> str:
   os.makedirs(CACHE_DIR, exist_ok=True)
   key = stable_id(CHAT_MODEL + prompt)
   path = os.path.join(CACHE_DIR, key + ".json")
-  # TODO 实现缓存逻辑
+  #  实现缓存逻辑
+  if os.path.exists(path):
+    return json.load(open(path, encoding="utf-8"))
+  resp = ollama.chat(model=CHAT_MODEL,
+                     messages=[{"role": "user", "content": prompt}],
+                     format="json")
+  content = resp["message"]["content"]
+  json.dump(content, open(path, "w", encoding="utf-8"))
+  LLM_MISSES += 1
+  return content 
   
 
-def extract_from_text(text: str, text_unit_id: str) -> tuple[list[Entity], list[RelationShip]]:
+def extract_from_text(text: str, text_unit_id: str) -> tuple[list[Entity], list[Relationship]]:
   """对一块文本抽取 entities + relationships。"""
   prompt = EXTRACT_PROMPT.format(entity_types=ENTITY_TYPES, input_text=text)
   raw = cached_chat(prompt)
   entities: list[Entity] = []
   relationships: list[Relationship] = []
-
+  # 防御性解析 raw
+  try:
+    data = json.loads(raw)
+    entities.extend([Entity(
+      id=stable_id(d["name"] + d.get("type", "")),
+      title=d["name"],
+      type=d.get("type", ""),
+      description=d.get("description", ""),
+      text_unit_ids=[text_unit_id]
+    ) for d in data.get("entities", [])])
+    relationships.extend([Relationship(
+      id=stable_id(d["source"] + d["target"]),
+      source=d["source"],
+      target=d["target"],
+      description=d.get("description", ""),
+      text_unit_ids=[text_unit_id]
+    ) for d in data.get("relationships", [])])
+  except Exception as e:
+    return entities, relationships
   return entities, relationships
 
 
@@ -52,4 +82,17 @@ def run_extract():
   tu = pd.read_parquet(f"{OUTPUT_DIR}/text_units.parquet").head(SAMPLE_N)
   entities: list[Entity] = []
   relationships: list[Relationship] = []
+  # 遍历 tu 每一行
+  for row in tu.itertuples(index=False):
+    es, rs = extract_from_text(row.text, row.id)
+    entities.extend(es)
+    relationships.extend(rs)
+
+  pd.DataFrame([e.__dict__ for e in entities]).to_parquet(f"{OUTPUT_DIR}/entities_raw.parquet")
+  pd.DataFrame([r.__dict__ for r in relationships]).to_parquet(f"{OUTPUT_DIR}/relationships_raw.parquet")
+  print(f"抽取完成：entities_raw={len(entities)} relationships_raw={len(relationships)} (LLM_MISSES={LLM_MISSES})")
+
+
+if __name__ == "__main__":
+  run_extract()
 
