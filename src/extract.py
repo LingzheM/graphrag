@@ -39,12 +39,17 @@ def cached_chat(prompt: str) -> str:
   path = os.path.join(CACHE_DIR, key + ".json")
   #  实现缓存逻辑
   if os.path.exists(path):
-    return json.load(open(path, encoding="utf-8"))
-  resp = ollama.chat(model=CHAT_MODEL,
-                     messages=[{"role": "user", "content": prompt}],
-                     format="json")
+    with open(paht, encoding="utf-8") as f:
+      return json.load(f)
+    
+  resp = ollama.chat(
+    model=CHAT_MODEL,
+    messages=[{"role": "user", "content": prompt}],
+    format="json",
+  )
   content = resp["message"]["content"]
-  json.dump(content, open(path, "w", encoding="utf-8"))
+  with open(path, "w", encoding="utf-8") as f:
+    json.dump(content, f)
   LLM_MISSES += 1
   return content 
   
@@ -53,27 +58,39 @@ def extract_from_text(text: str, text_unit_id: str) -> tuple[list[Entity], list[
   """对一块文本抽取 entities + relationships。"""
   prompt = EXTRACT_PROMPT.format(entity_types=ENTITY_TYPES, input_text=text)
   raw = cached_chat(prompt)
+
   entities: list[Entity] = []
   relationships: list[Relationship] = []
   # 防御性解析 raw
   try:
     data = json.loads(raw)
-    entities.extend([Entity(
-      id=stable_id(d["name"] + d.get("type", "")),
-      title=d["name"],
+  except (json.JSONDecodeError, TypeError):
+    return entities, relationships
+  
+  for d in data.get("entities", []):
+    name = (d.get("name") or "").strip()
+    if not name:
+      continue
+    entities.append(Entity(
+      id=stable_id(name + d.get("type", "")),
+      title=name,
       type=d.get("type", ""),
       description=d.get("description", ""),
       text_unit_ids=[text_unit_id]
-    ) for d in data.get("entities", [])])
-    relationships.extend([Relationship(
-      id=stable_id(d["source"] + d["target"]),
-      source=d["source"],
-      target=d["target"],
+    ))
+  for d in data.get("relationships", []):
+    src = (d.get("source") or "").strip()
+    tgt = (d.get("target") or "").strip()
+    if not src or not tgt:
+      continue
+    relationships.append(Relationship(
+      id=stable_id(src + tgt),
+      source=src,
+      target=tgt,
       description=d.get("description", ""),
       text_unit_ids=[text_unit_id]
-    ) for d in data.get("relationships", [])])
-  except Exception as e:
-    return entities, relationships
+    ))
+  
   return entities, relationships
 
 
@@ -83,11 +100,12 @@ def run_extract():
   entities: list[Entity] = []
   relationships: list[Relationship] = []
   # 遍历 tu 每一行
-  for row in tu.itertuples(index=False):
+  for i, row in enumerate(tu.itertuples(index=False), 1):
     es, rs = extract_from_text(row.text, row.id)
     entities.extend(es)
     relationships.extend(rs)
-
+    print(f"  [{i}/{len(tu)}] {row.id}: +{len(es)} 实体, +{len(rs)} 关系")
+  
   pd.DataFrame([e.__dict__ for e in entities]).to_parquet(f"{OUTPUT_DIR}/entities_raw.parquet")
   pd.DataFrame([r.__dict__ for r in relationships]).to_parquet(f"{OUTPUT_DIR}/relationships_raw.parquet")
   print(f"抽取完成：entities_raw={len(entities)} relationships_raw={len(relationships)} (LLM_MISSES={LLM_MISSES})")
