@@ -10,7 +10,7 @@ CHAT_MODEL = "qwen2.5:7b"
 OUTPUT_DIR = "output"
 CACHE_DIR = "cache/llm"
 ENTITY_TYPES = "PERSON, PLACE, ORGANIZATION, EVENT, OBJECT"
-SAMPLE_N = 8  # 先只抽前 N 块文本
+SAMPLE_N = 60  # 先只抽前 N 块文本
 
 LLM_MISSES = 0  # 缓存未命中（真打了模型）的次数
 
