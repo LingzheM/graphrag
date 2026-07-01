@@ -2,7 +2,7 @@
 name = "graphrag-monorepo"
 version = "0.0.0"
 requires-python = ">=3.11"
-dependencies = ["pandas", "pyarrow", "ollama", "networkx", "matplotlib"]
+dependencies = ["pandas", "pyarrow", "ollama", "networkx", "matplotlib", "graspologic"]
 
 [tool.uv]
 package = false
