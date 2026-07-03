@@ -125,6 +125,7 @@ def run():
 
   pd.DataFrame([c.__dict__ for c in communities]).to_parquet(f"{OUTPUT_DIR}/communities.parquet")
   pd.DataFrame([r.__dict__ for r in reports]).to_parquet(f"{OUTPUT_DIR}/community_reports.parquet")
+  by_level = Counter(c.level for c in communities)
   print(f"社区：{len(communities)}（各层 level→数量：{dict(sorted(by_level.items()))}）")
   print(f"报告：{len(reports)}（LLM_MISSES={LLM_MISSES}）")
 
