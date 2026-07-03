@@ -82,11 +82,11 @@ def detect_communities(G: nx.Graph) -> list[Community]:
     groups[(item.level, item.cluster)].append(item.node)
 
   communities: list[Community] = []
-  for (level, cluster), node in groups.items():
+  for (level, cluster), nodes in groups.items():
     communities.append(Community(
       id=stable_id(f"{level}-{cluster}"),
       level=level,
-      entity_ids=[]
+      entity_ids=nodes
     ))
   return communities
 
